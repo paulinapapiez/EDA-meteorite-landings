@@ -1,3 +1,7 @@
+## Demo online
+
+[Kliknij, aby zobaczyć działającą aplikację](https://paulinapapiez.shinyapps.io/Metorite-landings/)
+
 # EDA Meteorite Landings
 Shiny dashboard of NASA meteorite landings
 
