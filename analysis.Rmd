@@ -1,0 +1,187 @@
+---
+title: "Analiza Meteorów NASA"
+author: "Paulina Papież i Julia Bugielska"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Wprowadzenie
+
+Przedstawiamy analizę danych NASA dotyczących meteorów z lat 1900–2000.  
+Jest to zobrazowanie liczby meteorów w czasie, ich rozmieszczenia geograficznego oraz charakterystyki masy i klasy.
+
+## O danych
+
+Dane pochodzą z publicznej bazy NASA (Meteorite Landings). Zawierają rekordy odnalezionych i obserwowanych meteorów — m.in. nazwę, rok, masę (w gramach) oraz współrzędne geograficzne miejsca znalezienia lub upadku. Analizujemy rekordy z lat 1900–2000.
+
+## Metody analizy
+
+- Wczytanie lokalnego pliku CSV z danymi.  
+- Konwersja pola `year` na typ liczbowy.  
+- Filtrowanie rekordów na lata 1900–2000.  
+- Przygotowanie interaktywnej tabeli (DT), mapy (leaflet) oraz wykresów (plotly).  
+- Podział meteorytów na 5 grup masowych według kwantyli.  
+- Analiza trendów i wizualizacja wyników statystycznych.
+
+## Ciekawostki
+
+Najcięższy meteoryt z lat 1900–2000 ważył X g i został znaleziony w miejsce/rok.
+
+Najczęściej występująca klasa meteorytów w analizowanym okresie to Klasa Y.
+
+Najwięcej meteorów odnotowano w dekadzie 1960–1969.
+
+Większość meteorów pochodzi z typów Fell lub Found.
+
+## Wnioski
+
+Liczba meteorów obserwowanych w XX wieku wzrastała stopniowo z upływem dekad.
+
+Średnia masa meteorów jest zróżnicowana, a ekstremalnie ciężkie okazy są rzadkie.
+
+Rozmieszczenie geograficzne wskazuje na różnice w liczbie odnalezionych meteorów między regionami.
+
+Analiza klas i typów meteorytów pozwala wnioskować o różnorodności materiałów i ich pochodzeniu.
+
+---
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+
+# Potrzebne biblioteki
+library(tidyverse)
+library(leaflet)
+library(DT)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(knitr)
+library(plotly)
+library(readr)
+#Dane
+
+url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-06-11/meteorites.csv"
+
+
+meteorites <- read_csv(url, show_col_types = FALSE)
+
+meteorites <- meteorites %>%
+mutate(
+Rok = suppressWarnings(as.numeric(substr(year, 1, 4))),
+Masa_g = as.numeric(mass),
+Szer_geo = as.numeric(lat),
+Dl_geo = as.numeric(long)
+) %>%
+filter(!is.na(Rok), Rok >= 1900, Rok <= 2000)
+
+meteorites <- meteorites %>%
+mutate(
+Szer_geo_opis = case_when(
+Szer_geo > 0 ~ paste0(round(Szer_geo, 4), "°N"),
+Szer_geo < 0 ~ paste0(abs(round(Szer_geo, 4)), "°S"),
+TRUE ~ NA_character_
+),
+Dl_geo_opis = case_when(
+Dl_geo > 0 ~ paste0(round(Dl_geo, 4), "°E"),
+Dl_geo < 0 ~ paste0(abs(round(Dl_geo, 4)), "°W"),
+TRUE ~ NA_character_
+)
+)
+
+#Tabela
+
+datatable(
+meteorites %>%
+select(name, class, Masa_g, Rok, Szer_geo_opis, Dl_geo_opis),
+colnames = c("Nazwa", "Klasa", "Masa (g)", "Rok", "Szerokość", "Długość"),
+rownames = FALSE,
+options = list(pageLength = 10, autoWidth = TRUE)
+)
+
+#Mapa 
+
+meteor_map <- meteorites %>%
+filter(!is.na(Szer_geo), !is.na(Dl_geo), !is.na(Masa_g)) %>%
+mutate(
+Masa_grupa = cut(
+Masa_g,
+breaks = quantile(Masa_g, probs = seq(0, 1, 0.2), na.rm = TRUE),
+labels = c("Bardzo małe", "Małe", "Średnie", "Duże", "Bardzo duże"),
+include.lowest = TRUE
+)
+)
+
+pal <- colorFactor(brewer.pal(5, "YlOrRd"), meteor_map$Masa_grupa)
+
+leaflet(meteor_map) %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+addCircleMarkers(
+lng = ~Dl_geo, lat = ~Szer_geo,
+color = ~pal(Masa_grupa),
+radius = ~pmin(sqrt(Masa_g)/300, 12),
+fillOpacity = 0.6,
+popup = ~paste0(
+"<b>Nazwa:</b> ", name,
+"<br><b>Klasa:</b> ", class,
+"<br><b>Masa:</b> ", formatC(Masa_g, big.mark = " "), " g",
+"<br><b>Rok:</b> ", Rok
+)
+) %>%
+addLegend("bottomright", pal = pal, values = ~Masa_grupa,
+title = "Grupy mas")
+
+#Liczba meteorów w dekadach
+
+decades <- meteorites %>%
+mutate(Dekada = Rok - Rok %% 10) %>%
+group_by(Dekada) %>%
+summarise(Liczba = n())
+
+plot_ly(decades, x = ~Dekada, y = ~Liczba, type = "bar",
+text = ~Liczba, textposition = "auto")
+
+#Top 10 klas meteorów
+
+top10 <- meteorites %>%
+group_by(class) %>%
+summarise(Liczba = n()) %>%
+arrange(desc(Liczba)) %>%
+slice_head(n = 10)
+
+plot_ly(top10,
+x = ~Liczba,
+y = ~reorder(class, Liczba),
+type = "bar",
+orientation = "h",
+text = ~Liczba,
+textposition = "auto")
+
+#Średnia masa w dekadach
+
+mass_trend <- meteorites %>%
+mutate(Dekada = Rok - Rok %% 10) %>%
+group_by(Dekada) %>%
+summarise(Srednia = mean(Masa_g, na.rm = TRUE))
+
+plot_ly(mass_trend, x = ~Dekada, y = ~Srednia,
+type = "scatter", mode = "lines+markers")
+
+#Statystki opisowe
+
+stats <- meteorites %>%
+summarise(
+Minimum = min(Masa_g, na.rm = TRUE),
+Maksimum = max(Masa_g, na.rm = TRUE),
+Mediana = median(Masa_g, na.rm = TRUE),
+Średnia = mean(Masa_g, na.rm = TRUE),
+Odchylenie_std = sd(Masa_g, na.rm = TRUE),
+Skośność = moments::skewness(Masa_g, na.rm = TRUE),
+Kurtoza = moments::kurtosis(Masa_g, na.rm = TRUE)
+)
+
+knitr::kable(stats)
+
+
+
+
+
+
