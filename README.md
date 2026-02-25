@@ -13,7 +13,5 @@ Użytkownik może filtrować dane według roku, masy meteorytu lub typu meteoryt
 
 ## Uruchomienie lokalnie
 1. Zainstaluj R i RStudio  
-2. Zainstaluj wymagane pakiety:  
-```r
-install.packages(c("shiny", "tidyverse", "leaflet"))
+2. Zainstaluj wymagane pakiety: "shiny", "tidyverse", "leaflet"
 3. Otwórz app.R w RStudio i kliknij Run App
