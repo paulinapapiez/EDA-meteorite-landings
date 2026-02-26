@@ -1,5 +1,18 @@
 # NASA Meteorite Landings Analysis (1900–2000)
 
+## 🌐 Live Demo
+
+The Shiny dashboard is deployed using shinyapps.io:
+
+🔗 https://paulinapapiez.shinyapps.io/Metorite-landings/
+
+You can explore:
+- Dynamic filtering
+- Interactive maps
+- Temporal trend analysis
+- Statistical summaries
+
+No local setup required.
 Comprehensive data analysis project exploring NASA meteorite landing records between 1900 and 2000.
 
 The repository includes:
